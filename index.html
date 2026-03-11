@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soapy Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   VARIABLES
+============================================================ */
+:root {
+  --red:       #ff1a1a;
+  --red-dim:   #cc0000;
+  --red-glow:  #ff1a1a66;
+  --red-faint: #ff1a1a18;
+  --dark:      #0a0505;
+  --dark2:     #110808;
+  --dark3:     #1a0a0a;
+  --panel:     #130808ee;
+  --border:    #ff1a1a55;
+  --text:      #ffcccc;
+  --text-dim:  #aa6666;
+  --fh:        'Rajdhani', sans-serif;
+  --fm:        'Share Tech Mono', monospace;
+}
+
+/* ============================================================
+   BASE
+============================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--dark);color:var(--text);font-family:var(--fm);overflow:hidden}
+
+/* scanlines */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);pointer-events:none;z-index:9999}
+/* bg glow */
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 60% 40% at 50% 0%,#3a000077 0%,transparent 70%),radial-gradient(ellipse 40% 60% at 0% 100%,#2a000044 0%,transparent 60%);pointer-events:none;z-index:0}
+
+/* slash corner utility */
+.slash   {clip-path:polygon(0 0,100% 0,100% 100%,16px 100%,0 calc(100% - 16px))}
+.slash-s {clip-path:polygon(0 0,100% 0,100% 100%,10px 100%,0 calc(100% - 10px))}
+.slash-l {clip-path:polygon(0 0,100% 0,100% 100%,22px 100%,0 calc(100% - 22px))}
+
+/* ============================================================
+   APP SHELL
+============================================================ */
+#app{
+  position:relative;z-index:1;
+  width:740px;height:92vh;margin:20px auto;
+  background:var(--panel);border:1px solid var(--border);
+  box-shadow:0 0 60px var(--red-glow),inset 0 0 30px rgba(255,0,0,.04);
+  display:flex;flex-direction:column;
+  clip-path:polygon(0 0,100% 0,100% 100%,24px 100%,0 calc(100% - 24px));
+}
+
+/* ============================================================
+   TOPBAR
+============================================================ */
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 18px;
+  background:linear-gradient(90deg,#1f0505,#2a0808);
+  border-bottom:1px solid var(--border);
+  font-family:var(--fh);font-size:20px;font-weight:700;letter-spacing:3px;
+  text-transform:uppercase;color:var(--red);text-shadow:0 0 12px var(--red);
+}
+#topbar .logo{display:flex;align-items:center;gap:10px}
+#topbar .logo::before{content:'⬡';font-size:22px;animation:pulse 2s infinite}
+#topbar-user{font-size:13px;color:var(--text-dim);letter-spacing:1px;font-family:var(--fm)}
+#topbar-user span{color:var(--red);text-shadow:0 0 6px var(--red-glow)}
+#conn-status{font-size:12px;font-family:var(--fm);letter-spacing:1px;color:var(--text-dim)}
+#conn-status.online {color:#00ff88;text-shadow:0 0 8px #00ff88}
+#conn-status.offline{color:var(--red);text-shadow:0 0 8px var(--red)}
+
+/* ============================================================
+   TOOLBAR
+============================================================ */
+#toolbar{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 14px;background:var(--dark3);
+  border-bottom:1px solid var(--border);flex-wrap:wrap;
+}
+#toolbar input[type="text"]{
+  background:#1a0808;border:1px solid var(--border);
+  color:var(--text);padding:7px 12px;
+  font-family:var(--fm);font-size:13px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+}
+#toolbar input[type="text"]:focus{border-color:var(--red);box-shadow:0 0 10px var(--red-glow)}
+#toolbar input[type="text"]::placeholder{color:var(--text-dim)}
+#name{width:130px}
+#text{flex:1;min-width:120px}
+#char-counter{font-size:11px;color:var(--text-dim);min-width:50px;text-align:right}
+#char-counter.warn{color:#ffaa00}
+#char-counter.over{color:var(--red);text-shadow:0 0 6px var(--red)}
+
+/* ============================================================
+   BUTTONS
+============================================================ */
+button{
+  background:linear-gradient(135deg,#2a0808,#1a0505);
+  border:1px solid var(--border);color:var(--text);
+  padding:7px 16px;font-family:var(--fh);font-size:14px;
+  font-weight:600;letter-spacing:1px;cursor:pointer;
+  transition:background .15s,box-shadow .15s,color .15s;
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+  outline:none;
+}
+button:hover{background:linear-gradient(135deg,var(--red-dim),#880000);box-shadow:0 0 14px var(--red-glow);color:#fff}
+button:active{transform:scale(.97)}
+button.icon{width:36px;height:36px;padding:0;font-size:16px;display:flex;align-items:center;justify-content:center}
+#send-btn{background:linear-gradient(135deg,var(--red-dim),#660000);color:#fff;border-color:var(--red)}
+#send-btn:hover{background:linear-gradient(135deg,var(--red),#aa0000);box-shadow:0 0 20px var(--red-glow)}
+.close-btn{cursor:pointer;background:none;border:none;padding:0 4px;color:var(--text-dim);font-size:16px;clip-path:none}
+.close-btn:hover{color:var(--red);box-shadow:none;background:none}
+
+/* ============================================================
+   CHAT
+============================================================ */
+#chat{
+  flex:1;overflow-y:auto;padding:14px 18px;
+  display:flex;flex-direction:column;gap:6px;
+  scrollbar-width:thin;scrollbar-color:var(--red-dim) var(--dark2);
+}
+#chat::-webkit-scrollbar{width:5px}
+#chat::-webkit-scrollbar-track{background:var(--dark2)}
+#chat::-webkit-scrollbar-thumb{background:var(--red-dim);border-radius:2px}
+
+.msg{
+  padding:8px 12px;background:var(--red-faint);
+  border-left:2px solid var(--border);
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+  animation:fadeIn .2s ease;word-break:break-word;
+}
+.msg:hover{background:rgba(255,20,20,.08)}
+.name{color:var(--red);font-family:var(--fh);font-weight:700;font-size:14px;letter-spacing:1px;text-shadow:0 0 8px var(--red-glow)}
+.msg-text{font-size:13px;color:var(--text)}
+.msg.error-msg{border-left-color:#ff6600;background:rgba(255,100,0,.08)}
+.msg.error-msg .msg-text{color:#ff9944}
+.audio-btn{margin-top:6px;font-size:12px;padding:5px 12px}
+
+/* ── Image in chat ── */
+.chat-img-wrap{
+  position:relative;display:inline-block;margin-top:8px;
+  clip-path:polygon(0 0,100% 0,100% 100%,10px 100%,0 calc(100% - 10px));
+  cursor:pointer;
+}
+.chat-img-wrap img{
+  max-width:260px;display:block;
+  border:1px solid var(--border);
+  transition:filter .2s;
+}
+.chat-img-wrap:hover img{
+  filter:brightness(.45);
+  box-shadow:0 0 20px var(--red-glow);
+  border-color:var(--red);
+}
+.chat-img-overlay{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity .2s;pointer-events:none;
+  flex-direction:column;gap:6px;
+}
+.chat-img-wrap:hover .chat-img-overlay{opacity:1}
+.chat-img-overlay span{
+  background:var(--red-dim);color:#fff;
+  padding:5px 14px;font-family:var(--fh);font-size:13px;font-weight:700;
+  letter-spacing:1px;
+  clip-path:polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px));
+  pointer-events:all;cursor:pointer;
+  box-shadow:0 0 12px var(--red-glow);
+}
+
+/* ============================================================
+   FLOATING WINDOWS — shared base
+============================================================ */
+.float-win{
+  position:fixed;
+  background:#0f0505ee;
+  border:1px solid var(--border);
+  box-shadow:0 0 30px var(--red-glow);
+  display:none;flex-direction:column;
+  z-index:100;
+  clip-path:polygon(0 0,100% 0,100% 100%,18px 100%,0 calc(100% - 18px));
+}
+.win-title{
+  background:linear-gradient(90deg,#1f0505,#2a0808);
+  padding:8px 14px;cursor:move;
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--fh);font-weight:700;font-size:15px;
+  letter-spacing:2px;color:var(--red);text-shadow:0 0 8px var(--red);
+  border-bottom:1px solid var(--border);user-select:none;
+}
+.win-body{padding:14px;display:flex;flex-direction:column;gap:10px}
+
+/* ============================================================
+   SOAPYSOUNDS SENDER
+============================================================ */
+#soundWindow{top:100px;left:80px;width:320px}
+#soundContent input[type="file"]{font-family:var(--fm);font-size:12px;color:var(--text-dim);cursor:pointer}
+#audioPlayer{width:100%;filter:hue-rotate(330deg) saturate(2)}
+
+/* ============================================================
+   SOAPYSOUNDS LISTENER
+============================================================ */
+#listenerWindow{top:140px;left:420px;width:360px}
+#waveCanvas{
+  width:100%;height:80px;
+  background:#0a0303;
+  border:1px solid var(--border);
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+  display:block;
+}
+.listener-controls{display:flex;gap:8px;align-items:center}
+.listener-controls button{flex:1;font-size:13px;padding:6px}
+#listener-label{font-size:11px;color:var(--text-dim);text-align:center}
+
+/* ============================================================
+   IMAGE SENDER
+============================================================ */
+#imgSendWindow{top:80px;left:120px;width:400px}
+#imgSendCanvas{
+  width:100%;max-height:200px;object-fit:contain;
+  background:#050202;
+  border:1px solid var(--border);
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+  display:block;
+}
+.slider-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim)}
+.slider-row label{width:90px;text-align:right;font-family:var(--fh);font-size:13px;letter-spacing:.5px}
+.slider-row input[type=range]{
+  flex:1;accent-color:var(--red);cursor:pointer;
+  height:4px;
+}
+.slider-row span{width:34px;text-align:left;color:var(--text);font-size:12px}
+#imgSendFile{font-family:var(--fm);font-size:12px;color:var(--text-dim);cursor:pointer}
+
+/* ============================================================
+   SOAPYIMAGES VIEWER
+============================================================ */
+#imgViewWindow{top:60px;left:160px;width:500px}
+#imgViewCanvas{
+  width:100%;max-height:280px;object-fit:contain;
+  background:#050202;
+  border:1px solid var(--border);
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+  display:block;
+}
+.view-actions{display:flex;gap:8px}
+.view-actions button{flex:1;font-size:12px;padding:6px 8px}
+#imgViewSenderName{font-size:12px;color:var(--text-dim);font-family:var(--fm)}
+#imgViewSenderName span{color:var(--red)}
+
+/* ============================================================
+   PHID OVERLAY
+============================================================ */
+#phid-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.85);
+  display:flex;align-items:center;justify-content:center;
+  z-index:500;backdrop-filter:blur(4px);
+}
+#phid-box{
+  background:#110606;border:1px solid var(--red);
+  box-shadow:0 0 60px var(--red-glow),0 0 120px #ff000022;
+  width:380px;padding:28px 28px 24px;
+  clip-path:polygon(0 0,100% 0,100% 100%,22px 100%,0 calc(100% - 22px));
+  display:flex;flex-direction:column;gap:16px;
+  animation:popIn .25s cubic-bezier(.34,1.56,.64,1);
+}
+#phid-box h2{font-family:var(--fh);font-size:22px;font-weight:700;letter-spacing:3px;color:var(--red);text-shadow:0 0 14px var(--red);text-transform:uppercase}
+#phid-box p{font-size:13px;color:var(--text-dim);line-height:1.6}
+#phid-box a{color:var(--red);text-decoration:none;font-weight:bold;text-shadow:0 0 6px var(--red-glow)}
+#phid-box a:hover{text-decoration:underline}
+#phid-input{
+  background:#1a0808;border:1px solid var(--border);
+  color:var(--text);padding:10px 14px;
+  font-family:var(--fm);font-size:13px;outline:none;width:100%;
+  transition:border-color .2s,box-shadow .2s;
+  clip-path:polygon(0 0,100% 0,100% 100%,8px 100%,0 calc(100% - 8px));
+}
+#phid-input:focus{border-color:var(--red);box-shadow:0 0 10px var(--red-glow)}
+#phid-input::placeholder{color:var(--text-dim)}
+#phid-error{color:#ff6644;font-size:12px;min-height:16px}
+.phid-btn-row{display:flex;gap:10px}
+.phid-btn-row button{flex:1}
+#step-confirm{display:none;flex-direction:column;gap:14px}
+#confirm-name{font-family:var(--fh);font-size:18px;color:#fff;letter-spacing:1px}
+#confirm-name span{color:var(--red);text-shadow:0 0 8px var(--red)}
+
+/* ============================================================
+   ANIMATIONS
+============================================================ */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+</style>
+</head>
+<body>
+
+<!-- ============ PHID OVERLAY ============ -->
+<div id="phid-overlay">
+  <div id="phid-box">
+    <div id="step-enter" style="display:flex;flex-direction:column;gap:14px">
+      <h2>⬡ Identity Check</h2>
+      <p>Enter your <strong>PHID</strong> to join.<br>
+         No account? <a href="https://phid-accpanel.onrender.com" target="_blank">Sign up here →</a></p>
+      <input id="phid-input" type="text" placeholder="PHID-xxxx-xxxx-xxxx-xxxx" spellcheck="false">
+      <div id="phid-error"></div>
+      <div class="phid-btn-row"><button onclick="lookupPhid()">Confirm</button></div>
+    </div>
+    <div id="step-confirm">
+      <h2>⬡ Is this you?</h2>
+      <div id="confirm-name">Username: <span id="confirm-username"></span></div>
+      <p style="font-size:12px;color:var(--text-dim)">Saved to this device — no re-login needed.</p>
+      <div class="phid-btn-row">
+        <button onclick="confirmIdentity()">Yes, that's me</button>
+        <button onclick="resetPhidStep()">Not me</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="app">
+  <div id="topbar">
+    <div class="logo">Soapy Chat</div>
+    <div id="topbar-user"></div>
+    <div id="conn-status">CONNECTING...</div>
+  </div>
+  <div id="toolbar">
+    <button class="icon" title="SoapySounds Sender"   onclick="openWin('soundWindow')">🔊</button>
+    <button class="icon" title="SoapySounds Listener" onclick="openWin('listenerWindow')">📻</button>
+    <button class="icon" title="Image Sender"         onclick="openImageSender()">🖼️</button>
+    <input id="name" type="text" placeholder="Username" disabled>
+    <input id="text" type="text" placeholder="Message..." maxlength="300"
+           onkeydown="if(event.key==='Enter')send()" oninput="updateCounter()">
+    <span id="char-counter">0/300</span>
+    <button id="send-btn" onclick="send()">Send</button>
+    <input id="img" type="file" accept="image/*" hidden>
+  </div>
+  <div id="chat"></div>
+</div>
+
+<!-- ============ SOAPYSOUNDS SENDER ============ -->
+<div id="soundWindow" class="float-win">
+  <div class="win-title" id="soundTitle">
+    <span>⬡ SoapySounds</span>
+    <button class="close-btn" onclick="closeWin('soundWindow')">✖</button>
+  </div>
+  <div class="win-body" id="soundContent">
+    <input type="file" id="audioFile" accept="audio/*">
+    <audio id="audioPlayer" controls></audio>
+    <button onclick="sendAudio()">▶ Send Audio</button>
+  </div>
+</div>
+
+<!-- ============ SOAPYSOUNDS LISTENER ============ -->
+<div id="listenerWindow" class="float-win">
+  <div class="win-title" id="listenerTitle">
+    <span>⬡ SoapySounds Listener</span>
+    <button class="close-btn" onclick="closeWin('listenerWindow')">✖</button>
+  </div>
+  <div class="win-body">
+    <div id="listener-label">No audio loaded</div>
+    <canvas id="waveCanvas" width="320" height="80"></canvas>
+    <div class="listener-controls">
+      <button onclick="listenerPlay()">▶ Play</button>
+      <button onclick="listenerPause()">⏸ Pause</button>
+      <button onclick="listenerStop()">⏹ Stop</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ IMAGE SENDER ============ -->
+<div id="imgSendWindow" class="float-win">
+  <div class="win-title" id="imgSendTitle">
+    <span>⬡ Image Sender</span>
+    <button class="close-btn" onclick="closeWin('imgSendWindow')">✖</button>
+  </div>
+  <div class="win-body">
+    <input type="file" id="imgSendFile" accept="image/*">
+    <canvas id="imgSendCanvas"></canvas>
+    <div class="slider-row"><label>Brightness</label><input type="range" id="s-bright"  min="0"   max="200" value="100" oninput="applyFilters('send');updateVal(this)"><span id="v-bright">100</span></div>
+    <div class="slider-row"><label>Contrast</label>  <input type="range" id="s-contrast" min="0"   max="200" value="100" oninput="applyFilters('send');updateVal(this)"><span id="v-contrast">100</span></div>
+    <div class="slider-row"><label>Saturation</label><input type="range" id="s-sat"     min="0"   max="300" value="100" oninput="applyFilters('send');updateVal(this)"><span id="v-sat">100</span></div>
+    <div class="slider-row"><label>Hue</label>       <input type="range" id="s-hue"     min="-180" max="180" value="0"  oninput="applyFilters('send');updateVal(this)"><span id="v-hue">0</span></div>
+    <div class="slider-row"><label>Blur</label>      <input type="range" id="s-blur"    min="0"   max="20"  value="0"  oninput="applyFilters('send');updateVal(this)"><span id="v-blur">0</span></div>
+    <div class="slider-row"><label>Sharpness</label> <input type="range" id="s-sharp"   min="0"   max="10"  value="0"  oninput="applyFilters('send');updateVal(this)"><span id="v-sharp">0</span></div>
+    <div class="slider-row"><label>Opacity</label>   <input type="range" id="s-opacity" min="10"  max="100" value="100" oninput="applyFilters('send');updateVal(this)"><span id="v-opacity">100</span></div>
+    <button onclick="sendImage()">📤 Send Image</button>
+  </div>
+</div>
+
+<!-- ============ SOAPYIMAGES VIEWER ============ -->
+<div id="imgViewWindow" class="float-win">
+  <div class="win-title" id="imgViewTitle">
+    <span>⬡ SoapyImages</span>
+    <button class="close-btn" onclick="closeWin('imgViewWindow')">✖</button>
+  </div>
+  <div class="win-body">
+    <div id="imgViewSenderName">From: <span id="imgViewFrom"></span></div>
+    <canvas id="imgViewCanvas"></canvas>
+    <div class="slider-row"><label>Brightness</label><input type="range" id="v-bright2"   min="0"   max="200" value="100" oninput="applyFilters('view');updateVal2(this)"><span id="vv-bright">100</span></div>
+    <div class="slider-row"><label>Contrast</label>  <input type="range" id="v-contrast2" min="0"   max="200" value="100" oninput="applyFilters('view');updateVal2(this)"><span id="vv-contrast">100</span></div>
+    <div class="slider-row"><label>Saturation</label><input type="range" id="v-sat2"      min="0"   max="300" value="100" oninput="applyFilters('view');updateVal2(this)"><span id="vv-sat">100</span></div>
+    <div class="slider-row"><label>Hue</label>       <input type="range" id="v-hue2"      min="-180" max="180" value="0" oninput="applyFilters('view');updateVal2(this)"><span id="vv-hue">0</span></div>
+    <div class="slider-row"><label>Blur</label>      <input type="range" id="v-blur2"     min="0"   max="20"  value="0"  oninput="applyFilters('view');updateVal2(this)"><span id="vv-blur">0</span></div>
+    <div class="slider-row"><label>Sharpness</label> <input type="range" id="v-sharp2"    min="0"   max="10"  value="0"  oninput="applyFilters('view');updateVal2(this)"><span id="vv-sharp">0</span></div>
+    <div class="slider-row"><label>Opacity</label>   <input type="range" id="v-opacity2"  min="10"  max="100" value="100" oninput="applyFilters('view');updateVal2(this)"><span id="vv-opacity">100</span></div>
+    <div class="view-actions">
+      <button onclick="saveViewImage()">💾 Save</button>
+      <button onclick="copyViewImage()">📋 Copy</button>
+      <button onclick="resetViewSliders()">↺ Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCRIPT ============ -->
+<script>
+/* ────────────────────────────────────────────
+   CONSTANTS / STATE
+──────────────────────────────────────────── */
+const MAX_CHARS   = 300;
+const PHID_API    = "/phid/";
+const STORAGE_KEY = "soapychat_phid_identity";
+
+let ws           = null;
+let joined       = false;
+let currentAudio = null;
+let pendingPhid  = null;
+let pendingUser  = null;
+
+// Image sender state
+let sendImgEl    = null;   // original Image element for sender
+let viewImgEl    = null;   // original Image element for viewer
+let viewImgFrom  = "";
+
+/* ────────────────────────────────────────────
+   PHID — fresh lookup every visit
+──────────────────────────────────────────── */
+window.addEventListener("DOMContentLoaded", async () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    const { phid } = JSON.parse(saved);
+    // Always re-fetch latest username from server
+    try {
+      const res  = await fetch(PHID_API + encodeURIComponent(phid));
+      const data = await res.json();
+      if (data.status !== "not_found" && data.status !== "error") {
+        // Update stored username in case it changed
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: data.username, phid }));
+        applyIdentity(data.username);
+        document.getElementById("phid-overlay").style.display = "none";
+        return;
+      }
+    } catch(e) {
+      // If server unreachable, fall back to cached username
+      applyIdentity(JSON.parse(saved).username);
+      document.getElementById("phid-overlay").style.display = "none";
+      return;
+    }
+  }
+  // No saved identity → show overlay
+});
+
+async function lookupPhid() {
+  const val = document.getElementById("phid-input").value.trim();
+  if (!val) { setPhidErr("Please enter a PHID."); return; }
+  setPhidErr("Looking up...");
+  try {
+    const res  = await fetch(PHID_API + encodeURIComponent(val));
+    const data = await res.json();
+    if (data.status === "not_found") { setPhidErr("PHID not found."); return; }
+    if (data.status === "error")     { setPhidErr("Server error. Try again."); return; }
+    pendingPhid = val;
+    pendingUser = data.username;
+    document.getElementById("confirm-username").textContent = data.username;
+    document.getElementById("step-enter").style.display   = "none";
+    document.getElementById("step-confirm").style.display = "flex";
+    setPhidErr("");
+  } catch(e) { setPhidErr("Could not reach server. Try again."); }
+}
+
+function confirmIdentity() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: pendingUser, phid: pendingPhid }));
+  applyIdentity(pendingUser);
+  document.getElementById("phid-overlay").style.display = "none";
+}
+
+function resetPhidStep() {
+  pendingPhid = pendingUser = null;
+  document.getElementById("step-enter").style.display   = "flex";
+  document.getElementById("step-confirm").style.display = "none";
+  document.getElementById("phid-input").value = "";
+  setPhidErr("");
+}
+
+function applyIdentity(username) {
+  const nameInput = document.getElementById("name");
+  nameInput.value    = username;
+  nameInput.disabled = true;
+  // Update topbar
+  const tu = document.getElementById("topbar-user");
+  tu.innerHTML = `Logged in as <span>${esc(username)}</span>`;
+  // Re-join WS with new name if already connected
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "join", name: username }));
+    joined = true;
+  }
+}
+
+function setPhidErr(msg) { document.getElementById("phid-error").textContent = msg; }
+
+document.getElementById("phid-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") lookupPhid();
+});
+
+/* ────────────────────────────────────────────
+   WEBSOCKET
+──────────────────────────────────────────── */
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById("conn-status").textContent = "● ONLINE";
+    document.getElementById("conn-status").className   = "online";
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const { username } = JSON.parse(saved);
+      ws.send(JSON.stringify({ type: "join", name: username }));
+      joined = true;
+    }
+  };
+  ws.onclose = () => {
+    document.getElementById("conn-status").textContent = "● OFFLINE";
+    document.getElementById("conn-status").className   = "offline";
+    setTimeout(connect, 3000);
+  };
+  ws.onerror = () => ws.close();
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if      (msg.type === "history") { document.getElementById("chat").innerHTML = ""; msg.messages.forEach(addMessage); }
+    else if (msg.type === "error")   addErrorMessage(msg.content);
+    else                             addMessage(msg);
+  };
+}
+connect();
+
+/* ────────────────────────────────────────────
+   CHAT RENDER
+──────────────────────────────────────────── */
+function addMessage(msg) {
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg";
+
+  if (msg.type === "image") {
+    // Build image with hover overlay
+    const uniqueId = "cimg_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    d.innerHTML = `
+      <span class="name">${esc(msg.name)}</span><br>
+      <div class="chat-img-wrap" onclick="openSoapyImages('${uniqueId}','${esc(msg.name)}')">
+        <img id="${uniqueId}" src="${msg.content}" alt="image">
+        <div class="chat-img-overlay"><span>🖼 Open</span></div>
+      </div>`;
+  } else if (msg.type === "audio") {
+    const safeContent = msg.content.replace(/'/g, "\\'");
+    d.innerHTML = `
+      <span class="name">${esc(msg.name)}</span>
+      <span class="msg-text"> sent audio</span><br>
+      <button class="audio-btn" onclick="loadListener('${safeContent}','${esc(msg.name)}')">🔊 Open in SoapySounds</button>`;
+  } else {
+    d.innerHTML = `<span class="name">${esc(msg.name)}:</span> <span class="msg-text">${esc(msg.content)}</span>`;
+  }
+
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function addErrorMessage(text) {
+  const chat = document.getElementById("chat");
+  const d = document.createElement("div");
+  d.className = "msg error-msg";
+  d.innerHTML = `<span class="msg-text">⚠ ${esc(text)}</span>`;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+  setTimeout(() => d.remove(), 4000);
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ────────────────────────────────────────────
+   TEXT SEND
+──────────────────────────────────────────── */
+function updateCounter() {
+  const len = document.getElementById("text").value.length;
+  const el  = document.getElementById("char-counter");
+  el.textContent = `${len}/${MAX_CHARS}`;
+  el.className   = len >= MAX_CHARS ? "over" : len >= 250 ? "warn" : "";
+}
+
+function send() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  const text = document.getElementById("text").value.trim();
+  if (!text) return;
+  if (text.length > MAX_CHARS) { addErrorMessage(`Max ${MAX_CHARS} chars!`); return; }
+  if (!joined) {
+    ws.send(JSON.stringify({ type:"join", name: document.getElementById("name").value || "Anonymous" }));
+    joined = true;
+  }
+  ws.send(JSON.stringify({ type:"message", content:text }));
+  document.getElementById("text").value = "";
+  updateCounter();
+}
+
+/* ────────────────────────────────────────────
+   FLOATING WINDOW HELPERS
+──────────────────────────────────────────── */
+const dragState = {};
+
+function openWin(id) {
+  const w = document.getElementById(id);
+  w.style.display = "flex";
+  w.style.zIndex  = 100 + Object.keys(dragState).length;
+}
+function closeWin(id) { document.getElementById(id).style.display = "none"; }
+
+function makeDraggable(titleId, winId) {
+  const title = document.getElementById(titleId);
+  const win   = document.getElementById(winId);
+  let dragging = false, ox = 0, oy = 0;
+  title.onmousedown = e => {
+    dragging = true; ox = e.offsetX; oy = e.offsetY;
+    win.style.zIndex = 200;
+  };
+  document.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    win.style.left = (e.pageX - ox) + "px";
+    win.style.top  = (e.pageY - oy) + "px";
+  });
+  document.addEventListener("mouseup", () => dragging = false);
+}
+
+makeDraggable("soundTitle",    "soundWindow");
+makeDraggable("listenerTitle", "listenerWindow");
+makeDraggable("imgSendTitle",  "imgSendWindow");
+makeDraggable("imgViewTitle",  "imgViewWindow");
+
+/* ────────────────────────────────────────────
+   SOAPYSOUNDS SENDER
+──────────────────────────────────────────── */
+document.getElementById("audioFile").onchange = () => {
+  const r = new FileReader();
+  r.onload = () => {
+    currentAudio = r.result;
+    document.getElementById("audioPlayer").src = currentAudio;
+  };
+  r.readAsDataURL(document.getElementById("audioFile").files[0]);
+};
+
+function sendAudio() {
+  if (!currentAudio) return;
+  if (!joined) {
+    ws.send(JSON.stringify({ type:"join", name: document.getElementById("name").value || "Anonymous" }));
+    joined = true;
+  }
+  ws.send(JSON.stringify({ type:"audio", content:currentAudio }));
+  closeWin("soundWindow");
+}
+
+/* ────────────────────────────────────────────
+   SOAPYSOUNDS LISTENER  (waveform visualizer)
+──────────────────────────────────────────── */
+let listenerCtx   = null;
+let listenerSrc   = null;
+let listenerAnal  = null;
+let listenerAnimId= null;
+let listenerAudio = null;
+
+function loadListener(dataUrl, senderName) {
+  openWin("listenerWindow");
+  document.getElementById("listener-label").textContent = `From: ${senderName}`;
+
+  // Stop previous
+  if (listenerCtx) { listenerCtx.close(); listenerCtx = null; }
+  if (listenerAnimId) { cancelAnimationFrame(listenerAnimId); listenerAnimId = null; }
+
+  listenerAudio = new Audio(dataUrl);
+  listenerAudio.crossOrigin = "anonymous";
+
+  listenerCtx  = new (window.AudioContext || window.webkitAudioContext)();
+  listenerSrc  = listenerCtx.createMediaElementSource(listenerAudio);
+  listenerAnal = listenerCtx.createAnalyser();
+  listenerAnal.fftSize = 256;
+  listenerSrc.connect(listenerAnal);
+  listenerAnal.connect(listenerCtx.destination);
+
+  drawWave();
+}
+
+function drawWave() {
+  const canvas = document.getElementById("waveCanvas");
+  const ctx    = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  function frame() {
+    listenerAnimId = requestAnimationFrame(frame);
+    const buf = new Uint8Array(listenerAnal ? listenerAnal.frequencyBinCount : 64);
+    if (listenerAnal) listenerAnal.getByteTimeDomainData(buf);
+
+    ctx.fillStyle = "#0a0303";
+    ctx.fillRect(0, 0, W, H);
+
+    // Glow effect
+    ctx.shadowBlur  = 8;
+    ctx.shadowColor = "#ff1a1a";
+    ctx.strokeStyle = "#ff1a1a";
+    ctx.lineWidth   = 2;
+    ctx.beginPath();
+
+    const sliceW = W / buf.length;
+    let x = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const v = buf[i] / 128;
+      const y = (v * H) / 2;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      x += sliceW;
+    }
+    ctx.lineTo(W, H / 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  frame();
+}
+
+function listenerPlay()  { if (listenerAudio) { listenerCtx.resume(); listenerAudio.play(); } }
+function listenerPause() { if (listenerAudio) listenerAudio.pause(); }
+function listenerStop()  {
+  if (listenerAudio) { listenerAudio.pause(); listenerAudio.currentTime = 0; }
+}
+
+/* ────────────────────────────────────────────
+   IMAGE SENDER
+──────────────────────────────────────────── */
+function openImageSender() { openWin("imgSendWindow"); }
+
+document.getElementById("imgSendFile").onchange = () => {
+  const file = document.getElementById("imgSendFile").files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    sendImgEl = new Image();
+    sendImgEl.onload = () => {
+      resetSendSliders();
+      applyFilters("send");
+    };
+    sendImgEl.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+
+function applyFilters(mode) {
+  if (mode === "send") {
+    if (!sendImgEl) return;
+    renderToCanvas("imgSendCanvas", sendImgEl,
+      parseFloat(document.getElementById("s-bright").value),
+      parseFloat(document.getElementById("s-contrast").value),
+      parseFloat(document.getElementById("s-sat").value),
+      parseFloat(document.getElementById("s-hue").value),
+      parseFloat(document.getElementById("s-blur").value),
+      parseFloat(document.getElementById("s-sharp").value),
+      parseFloat(document.getElementById("s-opacity").value)
+    );
+  } else {
+    if (!viewImgEl) return;
+    renderToCanvas("imgViewCanvas", viewImgEl,
+      parseFloat(document.getElementById("v-bright2").value),
+      parseFloat(document.getElementById("v-contrast2").value),
+      parseFloat(document.getElementById("v-sat2").value),
+      parseFloat(document.getElementById("v-hue2").value),
+      parseFloat(document.getElementById("v-blur2").value),
+      parseFloat(document.getElementById("v-sharp2").value),
+      parseFloat(document.getElementById("v-opacity2").value)
+    );
+  }
+}
+
+function renderToCanvas(canvasId, img, bright, contrast, sat, hue, blur, sharp, opacity) {
+  const canvas = document.getElementById(canvasId);
+  const maxW = 460, maxH = 260;
+  let w = img.naturalWidth, h = img.naturalHeight;
+  if (w > maxW) { h = h * maxW / w; w = maxW; }
+  if (h > maxH) { w = w * maxH / h; h = maxH; }
+  canvas.width  = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+
+  // Build CSS filter string
+  let filterStr = `brightness(${bright}%) contrast(${contrast}%) saturate(${sat}%) hue-rotate(${hue}deg) blur(${blur}px) opacity(${opacity}%)`;
+  ctx.filter = filterStr;
+  ctx.drawImage(img, 0, 0, w, h);
+  ctx.filter = "none";
+
+  // Simulated sharpness via unsharp mask (convolve)
+  if (sharp > 0) {
+    const amount = sharp / 10;
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+    // Simple laplacian-based sharpen
+    const copy = new Uint8ClampedArray(d);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = (y * w + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          const lap =
+            -copy[i + c] * 4
+            + copy[((y-1)*w+x)*4+c]
+            + copy[((y+1)*w+x)*4+c]
+            + copy[(y*w+x-1)*4+c]
+            + copy[(y*w+x+1)*4+c];
+          d[i+c] = Math.min(255, Math.max(0, copy[i+c] - lap * amount));
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
+}
+
+function updateVal(el) {
+  const map = {"s-bright":"v-bright","s-contrast":"v-contrast","s-sat":"v-sat","s-hue":"v-hue","s-blur":"v-blur","s-sharp":"v-sharp","s-opacity":"v-opacity"};
+  const span = document.getElementById(map[el.id]);
+  if (span) span.textContent = el.value;
+}
+function updateVal2(el) {
+  const map = {"v-bright2":"vv-bright","v-contrast2":"vv-contrast","v-sat2":"vv-sat","v-hue2":"vv-hue","v-blur2":"vv-blur","v-sharp2":"vv-sharp","v-opacity2":"vv-opacity"};
+  const span = document.getElementById(map[el.id]);
+  if (span) span.textContent = el.value;
+}
+
+function resetSendSliders() {
+  [["s-bright",100],["s-contrast",100],["s-sat",100],["s-hue",0],["s-blur",0],["s-sharp",0],["s-opacity",100]].forEach(([id,v]) => {
+    document.getElementById(id).value = v;
+  });
+  ["v-bright","v-contrast","v-sat","v-hue","v-blur","v-sharp","v-opacity"].forEach((id,i) => {
+    document.getElementById(id).textContent = [100,100,100,0,0,0,100][i];
+  });
+}
+function resetViewSliders() {
+  [["v-bright2",100],["v-contrast2",100],["v-sat2",100],["v-hue2",0],["v-blur2",0],["v-sharp2",0],["v-opacity2",100]].forEach(([id,v]) => {
+    document.getElementById(id).value = v;
+  });
+  ["vv-bright","vv-contrast","vv-sat","vv-hue","vv-blur","vv-sharp","vv-opacity"].forEach((id,i) => {
+    document.getElementById(id).textContent = [100,100,100,0,0,0,100][i];
+  });
+  applyFilters("view");
+}
+
+function sendImage() {
+  const canvas = document.getElementById("imgSendCanvas");
+  if (!canvas.width) { addErrorMessage("Pick an image first!"); return; }
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
+  if (!joined) {
+    ws.send(JSON.stringify({ type:"join", name: document.getElementById("name").value || "Anonymous" }));
+    joined = true;
+  }
+  ws.send(JSON.stringify({ type:"image", content:dataUrl }));
+  closeWin("imgSendWindow");
+}
+
+/* ────────────────────────────────────────────
+   SOAPYIMAGES VIEWER
+──────────────────────────────────────────── */
+function openSoapyImages(imgId, senderName) {
+  const imgEl = document.getElementById(imgId);
+  if (!imgEl) return;
+
+  viewImgFrom = senderName;
+  viewImgEl   = new Image();
+  viewImgEl.crossOrigin = "anonymous";
+  viewImgEl.onload = () => {
+    resetViewSliders();
+    applyFilters("view");
+  };
+  viewImgEl.src = imgEl.src;
+
+  document.getElementById("imgViewFrom").textContent = senderName;
+  openWin("imgViewWindow");
+}
+
+function saveViewImage() {
+  const canvas = document.getElementById("imgViewCanvas");
+  const a = document.createElement("a");
+  a.href     = canvas.toDataURL("image/png");
+  a.download = `soapyimage_${Date.now()}.png`;
+  a.click();
+}
+
+async function copyViewImage() {
+  const canvas = document.getElementById("imgViewCanvas");
+  canvas.toBlob(async blob => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      addErrorMessage("✓ Image copied to clipboard!");
+    } catch(e) {
+      addErrorMessage("Copy failed — browser may not support it.");
+    }
+  });
+}
+</script>
+</body>
+</html>
